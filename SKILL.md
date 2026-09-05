@@ -20,8 +20,9 @@ description: 夸克网盘-Jellyfin影音自动管家。当用户表达想看某�
   - 电视剧保存基准目录：`/share/tv/`
 
 ### 2. 本地网盘查重
-- 调用 `search(path="/share/film", keyword="XXX")` 及 `search(path="/share/tv", keyword="XXX")`。
+- 调用 `list_files(path="/share/film")` 及 `list_files(path="/share/tv")`。
 - **判断逻辑**：
+  - 用户输入的名字可能不是网络上流行的名字，需要进行判断
   - 若已存在同名影视目录或媒体文件，**立即终止任务**，并回复：“网盘中已存在该资源（路径：...），无需重复检索与转存。”
   - 若不存在，继续执行后续步骤。
 
