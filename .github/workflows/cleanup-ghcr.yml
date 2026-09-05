@@ -1,0 +1,31 @@
+name: Cleanup old images
+
+on:
+  schedule:
+    # Every Sunday at 04:47 UTC.
+    - cron: "47 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+concurrency:
+  group: cleanup-packages
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete GHCR images older than 2 months
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
+          package: ${{ github.event.repository.name }}
+          older-than: 2 months
+          exclude-tags: latest
+          delete-untagged: true
+          delete-ghost-images: true
+          delete-orphaned-images: true
+          delete-partial-images: true

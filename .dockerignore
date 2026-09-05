@@ -1,0 +1,10 @@
+.git
+.github
+.goreleaser.yml
+.gitignore
+*.md
+quark-nd-mcp
+dist/
+.idea/
+.claude/
+**/*_test.go

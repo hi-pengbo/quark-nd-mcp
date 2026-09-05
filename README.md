@@ -40,6 +40,34 @@
 go build -o quark-nd-mcp .
 ```
 
+### Docker
+
+推送分支或 Git tag 后，GitHub Actions 会自动构建并推送到 GitHub Container Registry（`linux/amd64` 与 `linux/arm64`）。有 tag 时用 tag 作为镜像标签，没有 tag 时用分支名：
+
+```bash
+docker pull ghcr.io/michealjl/quark-nd-mcp:latest
+```
+
+运行前准备配置文件（至少包含 `cookie`），并映射到容器内 `/config/config.json`。容器默认以 Streamable HTTP 监听 `0.0.0.0:8080`：
+
+```bash
+docker run --rm -p 8080:8080 \
+  -v /path/to/config.json:/config/config.json:ro \
+  ghcr.io/michealjl/quark-nd-mcp:latest
+```
+
+追加启动参数会覆盖默认 `CMD`，需要一并写出：
+
+```bash
+docker run --rm -p 8080:8080 \
+  -v /path/to/config.json:/config/config.json:ro \
+  ghcr.io/michealjl/quark-nd-mcp:latest \
+  -http -addr 0.0.0.0:8080 -config /config/config.json -token your-secret
+```
+
+镜像标签示例：分支 `main` → `main`；tag `v1.2.0` → `v1.2.0`、`1.2.0`、`1.2`、`1`。默认分支和非预发布 semver tag 还会更新 `latest`。
+
+
 ## 配置
 
 在 `~/.quark-nd-disk/config.json` 创建配置文件：
@@ -63,6 +91,8 @@ go build -o quark-nd-mcp .
 
 ### 运行 MCP 服务器
 
+默认使用 STDIO 传输（适合本地桌面客户端拉起进程）：
+
 ```bash
 ./quark-nd-mcp
 ```
@@ -73,15 +103,69 @@ go build -o quark-nd-mcp .
 ./quark-nd-mcp -config /path/to/config.json
 ```
 
+### 使用 Streamable HTTP
+
+需要远程连接、多客户端或 HTTP 网关时，启用 Streamable HTTP（MCP 2025-03-26 及之后的标准 HTTP 传输，响应使用 SSE 流）：
+
+```bash
+./quark-nd-mcp -http
+```
+
+默认监听 `http://127.0.0.1:8080/mcp`。常用参数：
+
+```bash
+./quark-nd-mcp -http -addr 127.0.0.1:9000
+./quark-nd-mcp -transport http -path /mcp -token your-secret
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `-http` | 启用 Streamable HTTP（等价于 `-transport http`） | 关闭，使用 stdio |
+| `-transport` | `stdio` 或 `http` | `stdio` |
+| `-addr` | HTTP 监听地址 | `127.0.0.1:8080` |
+| `-path` | MCP 端点路径 | `/mcp` |
+| `-token` | 可选 Bearer Token，设置后请求需带 `Authorization: Bearer <token>` | 空 |
+
+健康检查：`GET /health` 返回 `ok`。
+
+默认绑定本机回环地址。若要监听所有网卡（例如 `-addr 0.0.0.0:8080`），请同时设置 `-token`，避免未鉴权的跨站工具调用。
+
 ### 配合 Claude Desktop 使用
 
-在 Claude Desktop 配置文件中添加（macOS 路径：`~/Library/Application Support/Claude/claude_desktop_config.json`）：
+**STDIO（推荐本地使用）**，在 Claude Desktop 配置文件中添加（macOS 路径：`~/Library/Application Support/Claude/claude_desktop_config.json`）：
 
 ```json
 {
   "mcpServers": {
     "quark-nd-mcp": {
       "command": "/path/to/quark-nd-mcp"
+    }
+  }
+}
+```
+
+**Streamable HTTP**，先启动 `./quark-nd-mcp -http`，再配置 URL：
+
+```json
+{
+  "mcpServers": {
+    "quark-nd-mcp": {
+      "url": "http://127.0.0.1:8080/mcp"
+    }
+  }
+}
+```
+
+若启用了 `-token`：
+
+```json
+{
+  "mcpServers": {
+    "quark-nd-mcp": {
+      "url": "http://127.0.0.1:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer your-secret"
+      }
     }
   }
 }

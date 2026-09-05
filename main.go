@@ -15,7 +15,7 @@ import (
 const usage = `Quark Net Disk MCP Server
 
 Usage:
-  quark-nd-mcp [flags]              Run the MCP server
+  quark-nd-mcp [flags]              Run the MCP server (stdio by default)
   quark-nd-mcp config <command>     Manage configuration
 
 Config Commands:
@@ -30,14 +30,21 @@ Config Keys:
 
 Flags:
   -config <path>                    Path to config file (default: ~/.quark-nd-disk/config.json)
+  -transport <stdio|http>           MCP transport (default: stdio)
+  -http                             Shortcut for -transport http
+  -addr <addr>                      HTTP listen address (default: 127.0.0.1:8080)
+  -path <path>                      HTTP MCP endpoint path (default: /mcp)
+  -token <token>                    Optional Bearer token for HTTP transport
   -h, -help                         Show this help message
 
 Examples:
   quark-nd-mcp config init
   quark-nd-mcp config set cookie "your_cookie_here"
   quark-nd-mcp config show
-  quark-nd-mcp                      # Run MCP server
-  quark-nd-mcp -config /path/to/config.json
+  quark-nd-mcp                              # STDIO transport
+  quark-nd-mcp -http                        # Streamable HTTP on 127.0.0.1:8080/mcp
+  quark-nd-mcp -http -addr 127.0.0.1:9000
+  quark-nd-mcp -transport http -token secret
 `
 
 func main() {
@@ -57,11 +64,61 @@ func main() {
 
 	// Parse flags for MCP server
 	configPath := ""
+	transport := "stdio"
+	httpAddr := ""
+	httpPath := ""
+	httpToken := ""
 	for i := 0; i < len(args); i++ {
-		if args[i] == "-config" && i+1 < len(args) {
+		switch args[i] {
+		case "-config":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "Error: -config requires a path")
+				os.Exit(1)
+			}
 			configPath = args[i+1]
 			i++
+		case "-transport":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "Error: -transport requires a value (stdio or http)")
+				os.Exit(1)
+			}
+			transport = args[i+1]
+			i++
+		case "-http":
+			transport = "http"
+		case "-addr":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "Error: -addr requires a listen address")
+				os.Exit(1)
+			}
+			httpAddr = args[i+1]
+			i++
+		case "-path":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "Error: -path requires an endpoint path")
+				os.Exit(1)
+			}
+			httpPath = args[i+1]
+			i++
+		case "-token":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "Error: -token requires a value")
+				os.Exit(1)
+			}
+			httpToken = args[i+1]
+			i++
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown flag: %s\n", args[i])
+			fmt.Print(usage)
+			os.Exit(1)
 		}
+	}
+
+	switch transport {
+	case "stdio", "http":
+	default:
+		fmt.Fprintf(os.Stderr, "Error: unsupported transport %q (use stdio or http)\n", transport)
+		os.Exit(1)
 	}
 
 	// Load config
@@ -89,8 +146,18 @@ func main() {
 	}()
 
 	// Run the server
-	if err := server.Run(ctx); err != nil {
-		log.Printf("Server failed: %v", err)
+	var runErr error
+	if transport == "http" {
+		runErr = server.RunHTTP(ctx, mcp.HTTPOptions{
+			Addr:  httpAddr,
+			Path:  httpPath,
+			Token: httpToken,
+		})
+	} else {
+		runErr = server.Run(ctx)
+	}
+	if runErr != nil {
+		log.Printf("Server failed: %v", runErr)
 		os.Exit(1)
 	}
 }
