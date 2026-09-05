@@ -1,3 +1,9 @@
+---
+name: quark_jellyfin_manager
+version: 1.0.0
+description: 夸克网盘-Jellyfin影音自动管家。当用户表达想看某部影视作品（如“我想看XXX”），或者要求搜索资源并整理时使用此Skill，自动完成资源搜索、查重、转存、清理垃圾文件及规范重命名。
+---
+
 # 夸克网盘影音自动管家 (Quark-Jellyfin Auto-Manager)
 
 ## 角色与目标
